@@ -1,0 +1,75 @@
+
+
+
+-- Создаем базу данных и пользователя (в MySQL-консоли)
+CREATE DATABASE IF NOT EXISTS `hexvoid` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'hexvoid_user'@'localhost' IDENTIFIED BY 'secure_password';
+GRANT ALL PRIVILEGES ON `hexvoid`.* TO 'hexvoid_user'@'localhost';
+FLUSH PRIVILEGES;
+
+USE `hexvoid`;
+
+-- Таблица пользователей
+CREATE TABLE `users` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `username` VARCHAR(50) NOT NULL UNIQUE,
+    `email` VARCHAR(100) NOT NULL UNIQUE,
+    `password` VARCHAR(255) NOT NULL,
+    `role` TINYINT NOT NULL DEFAULT 1,  -- 0=Guest(не зарегистрирован), 1=User, 2=VIP, 3=Admin
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Таблица кодов приглашений
+CREATE TABLE `invites` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(32) NOT NULL UNIQUE,
+    `used` TINYINT NOT NULL DEFAULT 0,  -- 0=не использован, 1=использован
+    `created_by` INT NULL,  -- ID пользователя, создавшего инвайт (null, если админом)
+    `used_by` INT NULL,     -- ID пользователя, который зарегистрировался по коду
+    `used_at` TIMESTAMP NULL,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Таблица ключей подписки
+CREATE TABLE `subscription_keys` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `key_code` VARCHAR(50) NOT NULL UNIQUE,
+    `used` TINYINT NOT NULL DEFAULT 0,  -- 0=не использован, 1=использован
+    `used_by` INT NULL,     -- ID пользователя, активировавшего ключ
+    `used_at` TIMESTAMP NULL,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Таблица новостей
+CREATE TABLE `news` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `title` VARCHAR(200) NOT NULL,
+    `content` TEXT NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Таблица экстренного сообщения (хранит 1 запись)
+CREATE TABLE `emergency` (
+    `id` INT NOT NULL PRIMARY KEY,
+    `message` TEXT NOT NULL,
+    `active` TINYINT NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+INSERT INTO `emergency` (`id`, `message`, `active`) VALUES (1, 'Система работает в штатном режиме.', 1);
+
+-- Таблица ссылок (полезные ссылки)
+CREATE TABLE `links` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `title` VARCHAR(100) NOT NULL,
+    `url` VARCHAR(255) NOT NULL,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Таблица попыток входа (для ограничения по IP)
+CREATE TABLE `login_attempts` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `ip_address` VARCHAR(45) NOT NULL,
+    `attempt_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
