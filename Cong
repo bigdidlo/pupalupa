@@ -1,0 +1,17 @@
+<?php
+// config.php: настройки подключения к БД и общие константы
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'hexvoid');
+define('DB_USER', 'hexvoid_user');
+define('DB_PASS', 'secure_password');  // используйте надёжный пароль
+
+try {
+    $pdo = new PDO('mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
+                   DB_USER, DB_PASS,
+                   [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+} catch (PDOException $e) {
+    // Если не удалось подключиться к БД, останавливаем выполнение
+    die("Не удалось подключиться к базе данных: " . htmlspecialchars($e->getMessage()));
+}
+session_start();  // запуск сессии на всех страницах
+?>
