@@ -1,0 +1,18 @@
+<?php
+// download.php
+require_once 'header.php';
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] < 2) {
+    // Если не VIP, возвращаемся обратно
+    header("Location: user.php");
+    exit;
+}
+
+// Здесь может быть логика либо прямой вывод файла, либо ссылка на скачивание
+// Например, просто показываем сообщение:
+?>
+
+<h2>Загрузка файла</h2>
+<p>Спасибо за подписку! Ваш файл готов к скачиванию:</p>
+<a href="path/to/file.zip"><button>Скачать файл</button></a>
+
+<?php require_once 'footer.php'; ?>
