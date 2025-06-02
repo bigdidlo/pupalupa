@@ -1,0 +1,62 @@
+<?php
+// login.php
+require_once 'header.php';
+
+if (isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit;
+}
+
+$error = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Проверяем CSRF
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $error = "Некорректный CSRF-токен.";
+    } else {
+        $username = trim($_POST['username']);
+        $password = $_POST['password'];
+        $ip = $_SERVER['REMOTE_ADDR'];
+
+        // Проверяем, не заблокирован ли IP
+        if (isIpBlocked($pdo, $ip)) {
+            $error = "Слишком много неудачных попыток. Попробуйте позже.";
+        } else {
+            // Получаем пользователя
+            $stmt = $pdo->prepare("SELECT id, password, role FROM users WHERE username = ?");
+            $stmt->execute([$username]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user && password_verify($password, $user['password'])) {
+                // Успешная авторизация
+                session_regenerate_id(true);  // предотвращаем фиксацию сессии
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['role'] = $user['role'];
+                // Записываем защитные параметры сессии (IP и User-Agent)
+                $_SESSION['IPaddr'] = $_SERVER['REMOTE_ADDR'];
+                $_SESSION['userAgent'] = $_SERVER['HTTP_USER_AGENT'];
+                // Успешный вход – перенаправляем пользователя
+                header("Location: index.php");
+                exit;
+            } else {
+                // Неправильные данные – записываем попытку
+                recordFailedLogin($pdo, $ip);
+                $error = "Неверный логин или пароль.";
+            }
+        }
+    }
+}
+?>
+
+<h2>Вход</h2>
+<?php if ($error): ?>
+    <div style="color: #f00;"><?= e($error) ?></div>
+<?php endif; ?>
+
+<form method="POST" action="login.php">
+    <input type="hidden" name="csrf_token" value="<?php echo getCsrfToken(); ?>">
+    <label>Логин:<br><input type="text" name="username" value="<?php echo e($_POST['username'] ?? ''); ?>"></label><br><br>
+    <label>Пароль:<br><input type="password" name="password"></label><br><br>
+    <input type="submit" value="Войти">
+</form>
+
+<?php require_once 'footer.php'; ?>
