@@ -1,0 +1,9 @@
+<?php
+// footer.php: вывод общего конца страницы
+?>
+</main>
+<footer>
+    <p>© HEXVOID.to, 2025</p>
+</footer>
+</body>
+</html>
