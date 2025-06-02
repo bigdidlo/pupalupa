@@ -1,0 +1,137 @@
+<?php
+// user.php
+require_once 'header.php';
+
+// Если не авторизован, отправляем на страницу входа
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
+
+$userId = $_SESSION['user_id'];
+$stmt = $pdo->prepare("SELECT username, role FROM users WHERE id = ?");
+$stmt->execute([$userId]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+$username = $user['username'];
+$role = $user['role'];
+
+$messages = [];
+
+// Обработка активации подписки ключом
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['activate_key'])) {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $messages[] = "Ошибка CSRF-токена.";
+    } else {
+        $key = trim($_POST['sub_key']);
+        if ($key === '') {
+            $messages[] = "Введите ключ подписки.";
+        } else {
+            $stmt = $pdo->prepare("SELECT * FROM subscription_keys WHERE key_code = ? AND used = 0");
+            $stmt->execute([$key]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                // Активируем подписку: меняем роль на VIP (2) и отмечаем ключ
+                $pdo->beginTransaction();
+                $updateUser = $pdo->prepare("UPDATE users SET role = 2 WHERE id = ?");
+                $updateUser->execute([$userId]);
+                $updateKey = $pdo->prepare("UPDATE subscription_keys SET used = 1, used_by = ?, used_at = NOW() WHERE id = ?");
+                $updateKey->execute([$userId, $row['id']]);
+                $pdo->commit();
+                $messages[] = "Подписка активирована! Вы VIP-пользователь.";
+                $role = 2;
+            } else {
+                $messages[] = "Неверный или уже использованный ключ.";
+            }
+        }
+    }
+}
+
+// Обработка генерации инвайта пользователем
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_invite'])) {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $messages[] = "Ошибка CSRF-токена.";
+    } else {
+        // Создаем случайный код приглашения
+        $code = bin2hex(random_bytes(4)); // 8 hex символов
+        $stmt = $pdo->prepare("INSERT INTO invites (code, created_by) VALUES (?, ?)");
+        $stmt->execute([$code, $userId]);
+        $messages[] = "Новый код приглашения: <strong>" . e($code) . "</strong>";
+    }
+}
+
+// Получаем список инвайтов, созданных этим пользователем
+$stmt = $pdo->prepare("SELECT code, used FROM invites WHERE created_by = ?");
+$stmt->execute([$userId]);
+$myInvites = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Текущие новости и ссылки уже выводятся в index.php, можем дублировать либо перенаправить
+?>
+
+<h2>Личный кабинет пользователя <?= e($username) ?></h2>
+
+<?php foreach ($messages as $msg): ?>
+    <div style="color: #0f0;"><?= $msg ?></div>
+<?php endforeach; ?>
+
+<p>Ваша роль: 
+<?php
+if ($role == 2) echo '<span style="color: #0f0;">VIP</span>';
+elseif ($role == 3) echo '<span style="color: #f00;">Admin</span>';
+else echo '<span style="color: #00f;">User</span>';
+?>
+</p>
+
+<?php if ($role < 2): ?>
+    <!-- Форма активации подписки -->
+    <h3>Активация подписки</h3>
+    <form method="POST" action="user.php">
+        <input type="hidden" name="csrf_token" value="<?php echo getCsrfToken(); ?>">
+        <label>Ключ подписки:<br><input type="text" name="sub_key"></label><br><br>
+        <input type="submit" name="activate_key" value="Активировать">
+    </form>
+<?php endif; ?>
+
+<h3>Ваши коды приглашений</h3>
+<form method="POST" action="user.php">
+    <input type="hidden" name="csrf_token" value="<?php echo getCsrfToken(); ?>">
+    <input type="submit" name="create_invite" value="Создать новый код приглашения">
+</form>
+<?php if ($myInvites): ?>
+    <ul>
+    <?php foreach ($myInvites as $inv): ?>
+        <li>
+            Код: <strong><?php echo e($inv['code']); ?></strong>
+            (<?php echo $inv['used'] ? '<span style="color:#f00;">Использован</span>' : '<span style="color:#0f0;">Свободен</span>'; ?>)
+        </li>
+    <?php endforeach; ?>
+    </ul>
+<?php else: ?>
+    <p>Пока у вас нет сгенерированных кодов приглашения.</p>
+<?php endif; ?>
+
+<h3>Скачать файл</h3>
+<?php if ($role == 2): ?>
+    <p><a href="download.php"><button>Скачать контент</button></a></p>
+<?php else: ?>
+    <p>Скачивание доступно только VIP-пользователям. Активируйте подписку.</p>
+<?php endif; ?>
+
+<h3>Новости</h3>
+<?php
+$stmt = $pdo->prepare("SELECT title, content, created_at FROM news ORDER BY created_at DESC");
+$stmt->execute();
+$newsItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+if ($newsItems) {
+    foreach ($newsItems as $news) {
+        echo '<article>';
+        echo '<h4>' . e($news['title']) . '</h4>';
+        echo '<small>' . e($news['created_at']) . '</small>';
+        echo '<p>' . nl2br(e($news['content'])) . '</p>';
+        echo '</article>';
+    }
+} else {
+    echo '<p>Новостей нет.</p>';
+}
+?>
+
+<?php require_once 'footer.php'; ?>
