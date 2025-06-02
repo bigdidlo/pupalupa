@@ -1,0 +1,66 @@
+<?php
+// admin/users.php
+require_once 'admin_header.php';
+
+echo '<h2>Пользователи</h2>';
+// Обработка изменения роли пользователя
+if (isset($_POST['change_role']) && isset($_POST['user_id'], $_POST['new_role'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $uid = $_POST['user_id'];
+        $newRole = $_POST['new_role'];
+        $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ?");
+        $stmt->execute([$newRole, $uid]);
+    }
+}
+
+// Обработка удаления пользователя
+if (isset($_POST['delete_user']) && isset($_POST['del_user_id'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $delId = $_POST['del_user_id'];
+        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+        $stmt->execute([$delId]);
+    }
+}
+
+// Вывод списка пользователей
+$stmt = $pdo->prepare("SELECT id, username, email, role, created_at FROM users");
+$stmt->execute();
+$users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+echo '<table>';
+echo '<tr><th>ID</th><th>Логин</th><th>Email</th><th>Роль</th><th>Дата регистрации</th><th>Действия</th></tr>';
+foreach ($users as $user) {
+    echo '<tr>';
+    echo '<td>' . $user['id'] . '</td>';
+    echo '<td>' . e($user['username']) . '</td>';
+    echo '<td>' . e($user['email']) . '</td>';
+    echo '<td>';
+    // Форма для смены роли
+    echo '<form method="POST" action="users.php" style="display:inline;">';
+    echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+    echo '<input type="hidden" name="user_id" value="' . $user['id'] . '">';
+    echo '<select name="new_role">';
+    $roles = [1 => 'User', 2 => 'VIP', 3 => 'Admin'];
+    foreach ($roles as $r => $rName) {
+        $sel = ($r == $user['role']) ? 'selected' : '';
+        echo "<option value=\"$r\" $sel>$rName</option>";
+    }
+    echo '</select>';
+    echo '<input type="submit" name="change_role" value="Сменить">';
+    echo '</form>';
+    echo '</td>';
+    echo '<td>' . e($user['created_at']) . '</td>';
+    echo '<td>';
+    // Кнопка удаления
+    echo '<form method="POST" action="users.php" onsubmit="return confirm(\'Удалить пользователя?\');">';
+    echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+    echo '<input type="hidden" name="del_user_id" value="' . $user['id'] . '">';
+    echo '<input type="submit" name="delete_user" value="Удалить">';
+    echo '</form>';
+    echo '</td>';
+    echo '</tr>';
+}
+echo '</table>';
+
+require_once 'admin_footer.php';
+?>
