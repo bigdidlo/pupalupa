@@ -1,0 +1,52 @@
+<?php
+// header.php
+require_once 'config.php';
+require_once 'functions.php';
+secureSessionCheck();  // проверяем сессию пользователя
+
+// Проверяем, авторизован ли пользователь
+$loggedIn = isset($_SESSION['user_id']);
+$role = 0;
+if ($loggedIn) {
+    $stmt = $pdo->prepare("SELECT role, username FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user) {
+        $role = $user['role'];
+        $username = $user['username'];
+    }
+}
+
+// Определяем цвет роли
+$roleColor = '';
+if ($role == 1) $roleColor = 'color: #00ffff;';     // User - голубой
+elseif ($role == 2) $roleColor = 'color: #00ff00;'; // VIP - зелёный
+elseif ($role == 3) $roleColor = 'color: #ff0000;'; // Admin - красный
+else $roleColor = 'color: #aaa;';                   // Guest - серый (неавторизованные)
+
+?>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>HEXVOID.to</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+    <h1 style="<?php echo $roleColor; ?>">HEXVOID.to</h1>
+    <nav>
+        <a href="index.php">Главная</a>
+        <?php if ($loggedIn): ?>
+            <a href="user.php">Личный кабинет</a>
+            <?php if ($role == 3): ?>
+                <a href="admin/index.php">Админка</a>
+            <?php endif; ?>
+            <a href="logout.php">Выйти (<?php echo e($username); ?>)</a>
+        <?php else: ?>
+            <a href="register.php">Регистрация</a>
+            <a href="login.php">Вход</a>
+        <?php endif; ?>
+    </nav>
+</header>
+<main>
