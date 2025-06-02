@@ -1,0 +1,60 @@
+<?php
+// admin/keys.php
+require_once 'admin_header.php';
+
+echo '<h2>Ключи подписки</h2>';
+
+// Создание ключей (генерация указанного количества)
+if (isset($_POST['generate_keys'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $count = intval($_POST['count']);
+        for ($i = 0; $i < $count; $i++) {
+            $key = bin2hex(random_bytes(6)); // 12-символьный ключ
+            $stmt = $pdo->prepare("INSERT INTO subscription_keys (key_code) VALUES (?)");
+            $stmt->execute([$key]);
+        }
+    }
+}
+
+// Удаление ключа
+if (isset($_POST['delete_key']) && isset($_POST['key_id'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $kid = $_POST['key_id'];
+        $stmt = $pdo->prepare("DELETE FROM subscription_keys WHERE id = ?");
+        $stmt->execute([$kid]);
+    }
+}
+
+// Список ключей
+$stmt = $pdo->prepare("SELECT id, key_code, used, used_by, used_at FROM subscription_keys");
+$stmt->execute();
+$keys = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+echo '<form method="POST" action="keys.php">';
+echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+echo 'Количество новых ключей: <input type="number" name="count" value="1" min="1" max="100">';
+echo '<input type="submit" name="generate_keys" value="Сгенерировать">';
+echo '</form>';
+
+echo '<table>';
+echo '<tr><th>ID</th><th>Ключ</th><th>Статус</th><th>Активирован кем (ID)</th><th>Дата активации</th><th>Действие</th></tr>';
+foreach ($keys as $key) {
+    echo '<tr>';
+    echo '<td>' . $key['id'] . '</td>';
+    echo '<td>' . e($key['key_code']) . '</td>';
+    echo '<td>' . ($key['used'] ? '<span style="color:#0f0;">Использован</span>' : '<span style="color:#ff0;">Свободен</span>') . '</td>';
+    echo '<td>' . ($key['used_by'] ? $key['used_by'] : '-') . '</td>';
+    echo '<td>' . ($key['used_at'] ? $key['used_at'] : '-') . '</td>';
+    echo '<td>';
+    echo '<form method="POST" action="keys.php" onsubmit="return confirm(\'Удалить этот ключ?\');">';
+    echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+    echo '<input type="hidden" name="key_id" value="' . $key['id'] . '">';
+    echo '<input type="submit" name="delete_key" value="Удалить">';
+    echo '</form>';
+    echo '</td>';
+    echo '</tr>';
+}
+echo '</table>';
+
+require_once 'admin_footer.php';
+?>
