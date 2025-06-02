@@ -1,0 +1,74 @@
+<?php
+// register.php
+require_once 'header.php';
+
+// Если пользователь уже залогинен, перенаправляем
+if (isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit;
+}
+
+$error = '';
+$success = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Проверяем CSRF-токен
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $error = "Некорректный CSRF-токен.";
+    } else {
+        // Получаем данные из формы и очищаем
+        $invite = trim($_POST['invite_code']);
+        $email = trim($_POST['email']);
+        $username = trim($_POST['username']);
+        $password = $_POST['password'];
+
+        // Проверки: поля не пустые
+        if (empty($invite) || empty($email) || empty($username) || empty($password)) {
+            $error = "Все поля обязательны для заполнения.";
+        } else {
+            // Проверяем код приглашения
+            $stmt = $pdo->prepare("SELECT * FROM invites WHERE code = ? AND used = 0");
+            $stmt->execute([$invite]);
+            $inv = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$inv) {
+                $error = "Неверный или уже использованный код приглашения.";
+            } else {
+                // Проверяем, не занят ли логин или email
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ? OR email = ?");
+                $stmt->execute([$username, $email]);
+                if ($stmt->fetchColumn() > 0) {
+                    $error = "Пользователь с таким логином или email уже существует.";
+                } else {
+                    // Хэшируем пароль
+                    $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+                    // Создаем нового пользователя с ролью 1 (User)
+                    $stmt = $pdo->prepare("INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, 1)");
+                    $stmt->execute([$username, $email, $passwordHash]);
+                    $newUserId = $pdo->lastInsertId();
+                    // Обновляем запись приглашения: отметим код как использованный
+                    $stmt = $pdo->prepare("UPDATE invites SET used = 1, used_by = ?, used_at = NOW() WHERE id = ?");
+                    $stmt->execute([$newUserId, $inv['id']]);
+                    $success = "Регистрация прошла успешно! Теперь вы можете войти на сайт.";
+                }
+            }
+        }
+    }
+}
+?>
+
+<h2>Регистрация</h2>
+<?php if ($error): ?>
+    <div style="color: #f00;"><?= e($error) ?></div>
+<?php elseif ($success): ?>
+    <div style="color: #0f0;"><?= e($success) ?></div>
+<?php endif; ?>
+
+<form method="POST" action="register.php">
+    <input type="hidden" name="csrf_token" value="<?php echo getCsrfToken(); ?>">
+    <label>Код приглашения:<br><input type="text" name="invite_code" value="<?php echo e($_POST['invite_code'] ?? ''); ?>"></label><br><br>
+    <label>Email:<br><input type="email" name="email" value="<?php echo e($_POST['email'] ?? ''); ?>"></label><br><br>
+    <label>Логин:<br><input type="text" name="username" value="<?php echo e($_POST['username'] ?? ''); ?>"></label><br><br>
+    <label>Пароль:<br><input type="password" name="password"></label><br><br>
+    <input type="submit" value="Зарегистрироваться">
+</form>
+
+<?php require_once 'footer.php'; ?>
