@@ -1,0 +1,30 @@
+<?php
+// admin/index.php
+require_once 'admin_header.php';  // убедитесь, что подключение идет из папки admin
+// Пример содержимого админ-панели
+echo '<h2>Административная панель</h2>';
+echo '<nav>';
+echo '<a href="users.php">Пользователи</a> | ';
+echo '<a href="invites.php">Приглашения</a> | ';
+echo '<a href="keys.php">Ключи подписки</a> | ';
+echo '<a href="news.php">Новости</a> | ';
+echo '<a href="links.php">Ссылки</a> | ';
+echo '<a href="emergency.php">Экстренное сообщение</a>';
+echo '</nav>';
+echo '<hr>';
+
+// Отображаем текущее экстренное сообщение
+$stmt = $pdo->prepare("SELECT message, active FROM emergency WHERE id = 1");
+$stmt->execute();
+$em = $stmt->fetch(PDO::FETCH_ASSOC);
+echo '<h3>Экстренное сообщение</h3>';
+if ($em && $em['active']) {
+    echo '<div style="background-color: #600; padding: 10px; color: #fff;">';
+    echo e($em['message']);
+    echo '</div>';
+} else {
+    echo '<p>Сообщение не активно.</p>';
+}
+?>
+
+<?php require_once 'admin_footer.php'; ?>
