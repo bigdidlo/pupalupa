@@ -1,0 +1,61 @@
+<?php
+// admin/links.php
+require_once 'admin_header.php';
+
+echo '<h2>Полезные ссылки</h2>';
+
+// Добавление новой ссылки
+if (isset($_POST['add_link'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $title = trim($_POST['title']);
+        $url = trim($_POST['url']);
+        if ($title && $url) {
+            $stmt = $pdo->prepare("INSERT INTO links (title, url) VALUES (?, ?)");
+            $stmt->execute([$title, $url]);
+        }
+    }
+}
+
+// Удаление ссылки
+if (isset($_POST['delete_link']) && isset($_POST['link_id'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $lid = $_POST['link_id'];
+        $stmt = $pdo->prepare("DELETE FROM links WHERE id = ?");
+        $stmt->execute([$lid]);
+    }
+}
+
+// Список ссылок
+$stmt = $pdo->prepare("SELECT id, title, url FROM links");
+$stmt->execute();
+$links = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+echo '<h3>Добавить ссылку</h3>';
+echo '<form method="POST" action="links.php">';
+echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+echo '<p><input type="text" name="title" placeholder="Название" required></p>';
+echo '<p><input type="url" name="url" placeholder="URL (начинать с http:// или https://)" required></p>';
+echo '<input type="submit" name="add_link" value="Добавить">';
+echo '</form>';
+
+echo '<h3>Список ссылок</h3>';
+echo '<table>';
+echo '<tr><th>ID</th><th>Название</th><th>URL</th><th>Действие</th></tr>';
+foreach ($links as $ln) {
+    echo '<tr>';
+    echo '<td>' . $ln['id'] . '</td>';
+    echo '<td>' . e($ln['title']) . '</td>';
+    echo '<td><a href="' . e($ln['url']) . '" target="_blank">' . e($ln['url']) . '</a></td>';
+    echo '<td>';
+    echo '<form method="POST" action="links.php" onsubmit="return confirm(\'Удалить ссылку?\');">';
+    echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+    echo '<input type="hidden" name="link_id" value="' . $ln['id'] . '">';
+    echo '<input type="submit" name="delete_link" value="Удалить">';
+    echo '</form>';
+    echo '</td>';
+    echo '</tr>';
+}
+echo '</table>';
+
+require_once 'admin_footer.php';
+?>
