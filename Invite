@@ -1,0 +1,56 @@
+<?php
+// admin/invites.php
+require_once 'admin_header.php';
+
+echo '<h2>Коды приглашений</h2>';
+
+// Создание нового кода
+if (isset($_POST['create_invite'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $code = bin2hex(random_bytes(5)); // создаем 10-символьный код
+        $stmt = $pdo->prepare("INSERT INTO invites (code) VALUES (?)");
+        $stmt->execute([$code]);
+    }
+}
+
+// Удаление кода
+if (isset($_POST['delete_invite']) && isset($_POST['invite_id'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $invId = $_POST['invite_id'];
+        $stmt = $pdo->prepare("DELETE FROM invites WHERE id = ?");
+        $stmt->execute([$invId]);
+    }
+}
+
+// Список кодов
+$stmt = $pdo->prepare("SELECT id, code, used, used_at, used_by FROM invites");
+$stmt->execute();
+$invites = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+echo '<form method="POST" action="invites.php">';
+echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+echo '<input type="submit" name="create_invite" value="Создать новый код приглашения">';
+echo '</form>';
+
+echo '<table>';
+echo '<tr><th>ID</th><th>Код</th><th>Статус</th><th>Использован кем (ID)</th><th>Дата использования</th><th>Действие</th></tr>';
+foreach ($invites as $inv) {
+    echo '<tr>';
+    echo '<td>' . $inv['id'] . '</td>';
+    echo '<td>' . e($inv['code']) . '</td>';
+    echo '<td>' . ($inv['used'] ? '<span style="color:#0f0;">Использован</span>' : '<span style="color:#ff0;">Свободен</span>') . '</td>';
+    echo '<td>' . ($inv['used_by'] ? $inv['used_by'] : '-') . '</td>';
+    echo '<td>' . ($inv['used_at'] ? $inv['used_at'] : '-') . '</td>';
+    echo '<td>';
+    echo '<form method="POST" action="invites.php" onsubmit="return confirm(\'Удалить этот код?\');">';
+    echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+    echo '<input type="hidden" name="invite_id" value="' . $inv['id'] . '">';
+    echo '<input type="submit" name="delete_invite" value="Удалить">';
+    echo '</form>';
+    echo '</td>';
+    echo '</tr>';
+}
+echo '</table>';
+
+require_once 'admin_footer.php';
+?>
