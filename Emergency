@@ -1,0 +1,30 @@
+<?php
+// admin/emergency.php
+require_once 'admin_header.php';
+
+echo '<h2>Экстренное сообщение</h2>';
+
+// Обработка формы
+if (isset($_POST['save_emergency'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $message = trim($_POST['message']);
+        $active = isset($_POST['active']) ? 1 : 0;
+        $stmt = $pdo->prepare("UPDATE emergency SET message = ?, active = ? WHERE id = 1");
+        $stmt->execute([$message, $active]);
+    }
+}
+
+// Получаем текущее сообщение
+$stmt = $pdo->prepare("SELECT message, active FROM emergency WHERE id = 1");
+$stmt->execute();
+$em = $stmt->fetch(PDO::FETCH_ASSOC);
+
+echo '<form method="POST" action="emergency.php">';
+echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+echo '<p><textarea name="message" rows="4" cols="50" placeholder="Текст сообщения">' . e($em['message']) . '</textarea></p>';
+echo '<p><label><input type="checkbox" name="active" ' . ($em['active'] ? 'checked' : '') . '> Активировать сообщение</label></p>';
+echo '<input type="submit" name="save_emergency" value="Сохранить">';
+echo '</form>';
+
+require_once 'admin_footer.php';
+?>
