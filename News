@@ -1,0 +1,61 @@
+<?php
+// admin/news.php
+require_once 'admin_header.php';
+
+echo '<h2>Новости</h2>';
+
+// Добавление новой новости
+if (isset($_POST['add_news'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $title = trim($_POST['title']);
+        $content = trim($_POST['content']);
+        if ($title && $content) {
+            $stmt = $pdo->prepare("INSERT INTO news (title, content) VALUES (?, ?)");
+            $stmt->execute([$title, $content]);
+        }
+    }
+}
+
+// Удаление новости
+if (isset($_POST['delete_news']) && isset($_POST['news_id'])) {
+    if (verifyCsrfToken($_POST['csrf_token'])) {
+        $nid = $_POST['news_id'];
+        $stmt = $pdo->prepare("DELETE FROM news WHERE id = ?");
+        $stmt->execute([$nid]);
+    }
+}
+
+// Список новостей
+$stmt = $pdo->prepare("SELECT id, title, created_at FROM news ORDER BY created_at DESC");
+$stmt->execute();
+$newsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+echo '<h3>Добавить новость</h3>';
+echo '<form method="POST" action="news.php">';
+echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+echo '<p><input type="text" name="title" placeholder="Заголовок" required></p>';
+echo '<p><textarea name="content" placeholder="Содержимое новости" rows="5" cols="50" required></textarea></p>';
+echo '<input type="submit" name="add_news" value="Добавить">';
+echo '</form>';
+
+echo '<h3>Список новостей</h3>';
+echo '<table>';
+echo '<tr><th>ID</th><th>Заголовок</th><th>Дата создания</th><th>Действие</th></tr>';
+foreach ($newsList as $nw) {
+    echo '<tr>';
+    echo '<td>' . $nw['id'] . '</td>';
+    echo '<td>' . e($nw['title']) . '</td>';
+    echo '<td>' . e($nw['created_at']) . '</td>';
+    echo '<td>';
+    echo '<form method="POST" action="news.php" onsubmit="return confirm(\'Удалить новость?\');">';
+    echo '<input type="hidden" name="csrf_token" value="' . getCsrfToken() . '">';
+    echo '<input type="hidden" name="news_id" value="' . $nw['id'] . '">';
+    echo '<input type="submit" name="delete_news" value="Удалить">';
+    echo '</form>';
+    echo '</td>';
+    echo '</tr>';
+}
+echo '</table>';
+
+require_once 'admin_footer.php';
+?>
