@@ -1,0 +1,77 @@
+<?php
+// functions.php: вспомогательные функции (подключается в каждом скрипте после config.php)
+
+/**
+ * Экранирует вывод для защиты от XSS.
+ */
+function e($string) {
+    return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Генерирует CSRF-токен и сохраняет в сессию (если еще не сгенерирован).
+ */
+function getCsrfToken() {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Проверяет CSRF-токен при POST-запросе.
+ */
+function verifyCsrfToken($token) {
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+}
+
+/**
+ * Проверка, заблокирован ли IP (более 3 попыток за 10 минут).
+ */
+function isIpBlocked($pdo, $ip) {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? AND attempt_time > (NOW() - INTERVAL 10 MINUTE)");
+    $stmt->execute([$ip]);
+    $count = $stmt->fetchColumn();
+    return ($count >= 3);
+}
+
+/**
+ * Запись неудачной попытки входа.
+ */
+function recordFailedLogin($pdo, $ip) {
+    $stmt = $pdo->prepare("INSERT INTO login_attempts (ip_address) VALUES (?)");
+    $stmt->execute([$ip]);
+}
+
+/**
+ * Очищает старые попытки (старше 1 дня) – чтобы таблица не разрасталась.
+ */
+function cleanupOldAttempts($pdo) {
+    $stmt = $pdo->prepare("DELETE FROM login_attempts WHERE attempt_time < (NOW() - INTERVAL 1 DAY)");
+    $stmt->execute();
+}
+
+/**
+ * Проверяет сессию пользователя на попытку угоня (IP и User-Agent).
+ * Если что-то не совпадает, сбрасывает сессию.
+ */
+function secureSessionCheck() {
+    if (isset($_SESSION['user_id'])) {
+        if (!isset($_SESSION['IPaddr']) || !isset($_SESSION['userAgent'])) {
+            // Если еще не сохранены, сохраняем при первом входе
+            $_SESSION['IPaddr'] = $_SERVER['REMOTE_ADDR'];
+            $_SESSION['userAgent'] = $_SERVER['HTTP_USER_AGENT'];
+        } else {
+            // Проверяем соответствие
+            if ($_SESSION['IPaddr'] !== $_SERVER['REMOTE_ADDR']
+                || $_SESSION['userAgent'] !== $_SERVER['HTTP_USER_AGENT']) {
+                // Невалидная сессия – уничтожаем
+                session_unset();
+                session_destroy();
+                header("Location: login.php");
+                exit;
+            }
+        }
+    }
+}
+?>
